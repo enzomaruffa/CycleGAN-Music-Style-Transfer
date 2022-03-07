@@ -74,6 +74,7 @@ def get_merged(multitrack):
     category_list = {'Bass': [], 'Drums': [], 'Guitar': [], 'Piano': [], 'Strings': []}
     program_dict = {'Piano': 0, 'Drums': 0, 'Guitar': 24, 'Bass': 32, 'Strings': 48}
 
+    # Adds the idx of each track to the category's lists
     for idx, track in enumerate(multitrack.tracks):
         if track.is_drum:
             category_list['Drums'].append(idx)
@@ -89,6 +90,7 @@ def get_merged(multitrack):
     tracks = []
     for key in category_list:
         if category_list[key]:
+            # If the index for this category exists, get the merged pianoroll (?)
             merged = multitrack[category_list[key]].get_merged_pianoroll()
             tracks.append(Track(merged, program_dict[key], key == 'Drums', key))
         else:
@@ -100,15 +102,25 @@ def converter(filepath):
     """Save a multi-track piano-roll converted from a MIDI file to target
     dataset directory and update MIDI information to `midi_dict`"""
     try:
+        # Gets the file name
         midi_name = os.path.splitext(os.path.basename(filepath))[0]
+        
+        # Creates multitrack with the name of the file
+        # A multitrack is something that stores track(s) along with global information.
+        # The resolution is "Time steps per quarter note"
         multitrack = Multitrack(resolution=24, name=midi_name)
 
+        # pretty_midi as an intermediate structure from the filepath
         pm = pretty_midi.PrettyMIDI(filepath)
         midi_info = get_midi_info(pm)
+        
+        # Creates the multitrack based on the pretty_midi
         multitrack = pypianoroll.from_pretty_midi(pm)
         merged = get_merged(multitrack)
 
         make_sure_path_exists(converter_path)
+        
+        # Saves the file as an npz
         merged.save(os.path.join(converter_path, midi_name + '.npz'))
 
         return [midi_name, midi_info]
@@ -119,13 +131,18 @@ def converter(filepath):
 
 def main():
     """Main function of the converter"""
+    
+    # Path for the midi files
     midi_paths = get_midi_path(os.path.join(ROOT_PATH, 'MIDI/pop/pop_test/origin_midi'))
     midi_dict = {}
+    
+    # Converts each file to the kv_pair structure
     kv_pairs = [converter(midi_path) for midi_path in midi_paths]
     for kv_pair in kv_pairs:
         if kv_pair is not None:
             midi_dict[kv_pair[0]] = kv_pair[1]
 
+    # Outputs files to the midis.json
     with open(os.path.join(ROOT_PATH, 'MIDI/pop/pop_test/midis.json'), 'w') as outfile:
         json.dump(midi_dict, outfile)
 
@@ -136,8 +153,14 @@ def main():
     count = 0
     make_sure_path_exists(cleaner_path)
     midi_dict_clean = {}
+    
+    # For eache file that we have converted previously
     for key in midi_dict:
+        
+        # If the file is a file that we can use (i.e. doesn't fall into the rejection criterias)
         if midi_filter(midi_dict[key]):
+            
+            # Assigns as a filtered midi
             midi_dict_clean[key] = midi_dict[key]
             count += 1
             shutil.copyfile(os.path.join(converter_path, key + '.npz'),
